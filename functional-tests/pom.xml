@@ -1,0 +1,348 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <artifactId>functional-tests</artifactId>
+  <version>0.0.1-SNAPSHOT</version>
+  <packaging>jar</packaging>
+
+  <parent>
+    <artifactId>product-service</artifactId>
+    <groupId>com.samples.products</groupId>
+    <version>0.0.1-SNAPSHOT</version>
+  </parent>
+
+  <properties>
+    <jacoco.percentage.instruction>0.90</jacoco.percentage.instruction>
+    <jacoco.missed.classes>0</jacoco.missed.classes>
+  </properties>
+
+
+  <dependencies>
+    <!-- These three dependencies are required by karate. -->
+    <dependency>
+      <groupId>com.intuit.karate</groupId>
+      <artifactId>karate-apache</artifactId>
+      <version>${karate.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>com.intuit.karate</groupId>
+      <artifactId>karate-junit5</artifactId>
+      <version>${karate.version}</version>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>com.intuit.karate</groupId>
+      <artifactId>karate-netty</artifactId>
+      <version>0.9.2</version>
+      <scope>test</scope>
+      <exclusions>
+        <exclusion>
+          <groupId>com.intuit.karate</groupId>
+          <artifactId>karate-apache</artifactId>
+        </exclusion>
+      </exclusions>
+    </dependency>
+
+    <!-- This brings in the microservice so it can be started for testing. -->
+    <!-- NOTE: There is no classifier here as we want the jar that has not been repackaged -->
+    <dependency>
+      <groupId>${project.groupId}</groupId>
+      <artifactId>microservice</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <!--This combines the resources and java files in one directory. It is a recommendation-->
+    <!--from the author of karate as it enables the feature files to be next to the related-->
+    <!--java files.-->
+    <resources>
+      <resource>
+        <directory>src/main/java</directory>
+        <excludes>
+          <exclude>**/*.java</exclude>
+        </excludes>
+      </resource>
+    </resources>
+    <!--This combines the test resources and test java files in one directory. It is a-->
+    <!--recommendation from the author of karate as it enables the feature files to be next -->
+    <!--to the related java files.-->
+    <testResources>
+      <testResource>
+        <directory>src/test/java</directory>
+        <excludes>
+          <exclude>**/*.java</exclude>
+        </excludes>
+      </testResource>
+    </testResources>
+
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-dependency-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>copy</id>
+            <phase>package</phase>
+            <goals>
+              <goal>copy</goal>
+            </goals>
+            <configuration>
+              <artifactItems>
+                <artifactItem>
+                  <groupId>${project.groupId}</groupId>
+                  <artifactId>microservice</artifactId>
+                  <version>${project.version}</version>
+                  <type>jar</type>
+                  <destFileName>app.jar</destFileName>
+                </artifactItem>
+              </artifactItems>
+              <outputDirectory>${project.build.directory}</outputDirectory>
+              <stripVersion>true</stripVersion>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <!-- The build-helper-maven-plugin is used to reserve some random ports for the -->
+      <!-- microservice and doubles port. -->
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>reserve-ports</id>
+            <goals>
+              <goal>reserve-network-port</goal>
+            </goals>
+            <phase>process-resources</phase>
+            <configuration>
+              <portNames>
+                <portName>microservice.port</portName>
+              </portNames>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- The maven-failsafe-plugin is used to run the functional tests. These tests are -->
+      <!-- run at the maven integration-test stage. Before these tests are run the-->
+      <!-- microservice and doubles are started by other plugins at the -->
+      <!-- pre-integration test stage. These services are also stopped at the -->
+      <!-- post-integration-test phase. -->
+      <!-- NOTE: systemPropertyVariables are used to pass in the values of the randomly -->
+      <!-- assigned ports into the running jvm. -->
+      <!-- NOTE: only tests in src/test/java/functionaltests are run. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.0.0-M5</version>
+        <configuration>
+          <includes>
+            <include>**/functionaltests/**/*Tests.java</include>
+          </includes>
+          <systemPropertyVariables>
+            <microservice.port>${microservice.port}</microservice.port>
+          </systemPropertyVariables>
+        </configuration>
+      </plugin>
+
+      <!-- The functional tests are excluded from maven-surefire-plugin -->
+      <!-- to make sure the functional tests will not be run at the -->
+      <!-- maven test stage. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-surefire-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>**/functionaltests/*Tests.java</exclude>
+          </excludes>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <compilerVersion>${java.version}</compilerVersion>
+          <fork>true</fork>
+          <source>${java.version}</source>
+          <target>${java.version}</target>
+        </configuration>
+      </plugin>
+
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <fork>true</fork>
+        </configuration>
+        <executions>
+          <!-- This starts the microservcie -->
+          <execution>
+            <id>microservice-process-start</id>
+            <phase>pre-integration-test</phase>
+            <goals>
+              <goal>start</goal>
+            </goals>
+            <configuration>
+              <skip>${skipTests}</skip>
+              <fork>true</fork>
+              <mainClass>com.samples.products.ProductsServiceApplication</mainClass>
+              <profiles>
+                <profile>test</profile>
+              </profiles>
+              <wait>500</wait>
+              <maxAttempts>120</maxAttempts>
+              <jvmArguments>${argLine}</jvmArguments>
+              <arguments>
+                <argument>--server.port=${microservice.port}</argument>
+                <argument>--spring.profiles.active=test</argument>
+              </arguments>
+            </configuration>
+          </execution>
+          <!--Stop all processes in reverse order-->
+          <execution>
+            <id>stop-all</id>
+            <phase>post-integration-test</phase>
+            <goals>
+              <goal>stop</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!--This is just to add some breathing space in stopping microservice
+      and releasing lock on jacoco files. -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <configuration>
+          <target>
+            <sleep seconds="3"/>
+          </target>
+        </configuration>
+        <executions>
+          <execution>
+            <id>sleep-for-a-while</id>
+            <phase>post-integration-test</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- This is required by jacoco to make the check goal work. -->
+      <plugin>
+        <artifactId>maven-resources-plugin</artifactId>
+        <version>${maven-resources-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>copy-class-files</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>copy-resources</goal>
+            </goals>
+            <configuration>
+              <overwrite>false</overwrite>
+              <resources>
+                <resource>
+                  <directory>../microservice/target/classes</directory>
+                </resource>
+              </resources>
+              <outputDirectory>${project.build.directory}/classes</outputDirectory>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+
+      <!-- For the functional tests JACOCO will pass the agent into the jvm running the spring  -->
+      <!-- microservice. It then merges the jacoco coverage from the unit tests in the -->
+      <!-- mircroservice module with the coverage from these tests and applies the code check -->
+      <!-- to the merged result. It also generates a report on the coverage that has the two -->
+      <!-- runs merged. -->
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco-maven-plugin.version}</version>
+        <executions>
+          <execution>
+            <id>jacoco-prepare-agent-functional-test</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+            <phase>test</phase>
+          </execution>
+          <execution>
+            <id>post-integration-merge</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>merge</goal>
+            </goals>
+            <configuration>
+              <fileSets>
+                <!-- Source the coverage information from the unit test run in the microservice module.-->
+                <fileSet>
+                  <directory>${project.parent.basedir}/microservice/target</directory>
+                  <includes>
+                    <include>jacoco.exec</include>
+                  </includes>
+                </fileSet>
+                <fileSet>
+                  <directory>${project.build.directory}</directory>
+                  <includes>
+                    <include>jacoco.exec</include>
+                  </includes>
+                </fileSet>
+              </fileSets>
+              <destFile>${project.build.directory}/jacoco-merged.exec</destFile>
+            </configuration>
+          </execution>
+          <execution>
+            <id>merged-report</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>report-aggregate</goal>
+            </goals>
+            <configuration>
+              <title>Merged Report</title>
+              <outputDirectory>${project.build.directory}/jacoco-report</outputDirectory>
+            </configuration>
+          </execution>
+          <execution>
+            <id>default-check</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>check</goal>
+            </goals>
+            <configuration>
+              <dataFile>${project.build.directory}/jacoco-merged.exec</dataFile>
+              <haltOnFailure>true</haltOnFailure>
+              <rules>
+                <rule>
+                  <element>BUNDLE</element>
+                  <limits>
+                    <limit>
+                      <counter>INSTRUCTION</counter>
+                      <value>COVEREDRATIO</value>
+                      <minimum>${jacoco.percentage.instruction}</minimum>
+                    </limit>
+                    <limit>
+                      <counter>CLASS</counter>
+                      <value>MISSEDCOUNT</value>
+                      <maximum>${jacoco.missed.classes}</maximum>
+                    </limit>
+                  </limits>
+                </rule>
+              </rules>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+
+  </build>
+</project>
