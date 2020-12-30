@@ -62,4 +62,4 @@ To create a docker image from this artefact add the pom profile `build-docker-im
   `mvn clean install -P build-docker-image`
   
 ## Coverage Report
-![Merged Coverage Report](coverage_report.png)  
+![Merged Coverage Report](coverage_report.PNG)  
